@@ -51,6 +51,7 @@ class Game_grid:
             col = site % self.size
             self.tiles[row][col].has_bomb = True
             self.tiles[row][col].adjacent_bombs = 0
+            #incrememt adjacent counts around newly-placed bomb 
             for dy in range(-1, 2, 1):
                 for dx in range(-1, 2, 1):
                     d_row = row + dy
@@ -111,7 +112,7 @@ class Game_grid:
         tile.flagged = False
         if tile.adjacent_bombs != 0 or tile.has_bomb: return 
 
-        #if a tile has 0 adjacent_bombs uncover it's nehbors
+        #if a tile has 0 adjacent_bombs uncover it's neighbors
         for dy in range(-1, 2, 1):
             for dx in range(-1, 2, 1):
                 d_row = row + dy
