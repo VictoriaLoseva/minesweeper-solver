@@ -69,6 +69,9 @@ class Solver:
                         if not self.game_grid.in_game_grid(d_row, d_col) or (d_row == row and d_col == col): continue
                         my_tile.neighbors.append(grid[d_row][d_col])
 
+
+    # finds all deterministic actions to take on the board
+    # does not modify state 
     def search_for_determinism(self, solver_grid:list[list[Solver_Tile]], render = False):
         actions = []
         for row in range(len(solver_grid)):
@@ -94,41 +97,45 @@ class Solver:
                 
         return actions
     
+    # flags the combination and takes all deterministic actions, returns list of (action, (row, col))
     def run_simulation(self, solver_grid:list[list[Solver_Tile]], combination:list[Solver_Tile], render = False):
-        print("running sim")
         actions = []
-        sim_grid = [[Solver_Tile() for col in range(self.game_grid.size) ] for row in range(self.game_grid.size)] #copy.copy(solver_grid)
-        self.extract_state(sim_grid)
-        #sim_grid = copy.copy(game_grid)
 
+        #make a copy of the board for the sim
+        sim_grid = [[Solver_Tile() for col in range(self.game_grid.size) ] for row in range(self.game_grid.size)]
+        self.extract_state(sim_grid)
+
+        #flag the neighbors 
         for neighbor in combination:
-            print(f"    flagging {neighbor.row}, {neighbor.col}")
+            # print(f"    flagging {neighbor.row}, {neighbor.col}")
             self.push_overlay(neighbor.row, neighbor.col, (255, 255, 0))
             sim_grid[neighbor.row][neighbor.col].state = State.FLAGGED
             actions += [(State.FLAGGED, (neighbor.row, neighbor.col))]
-            # neighbor.state = State.FLAGGED
         
+        #search for determinism until no more actions can be taken 
         while True: 
             new_actions = self.search_for_determinism(sim_grid)
-            
             if not new_actions: break
+
             #unpack the format that search for determinism returns
             new_actions = [(action, tile) for _, tile_actions in new_actions for action, tile in tile_actions]
-            # print([(action, (tile.row, tile.col)) for action, tile in new_actions])
+            
+            #apply the actions
             for action, acted_on_tile in new_actions:
                         acted_on_tile.state = action
             if not self.is_sat(sim_grid): return "unsat"
-            # self.extract_state(sim_grid)
+
+            #store the performed actions
             actions += [(action, (tile.row, tile.col)) for action, tile in new_actions]
         self.wait_for_input(self.screen, sim_grid)
 
         return actions
 
-
-    def is_sat(self, grid:list[list[Solver_Tile]]):
-        for row in range(len(grid)):
-            for col in range(len(grid[row])):
-                tile = grid[row][col]
+    #determines if board is internally consistent
+    def is_sat(self, solver_grid:list[list[Solver_Tile]]):
+        for row in range(len(solver_grid)):
+            for col in range(len(solver_grid[row])):
+                tile = solver_grid[row][col]
 
                 if(tile.covered() or tile.flagged() or tile.adjacent_bombs == 0): 
                     continue
@@ -137,15 +144,9 @@ class Solver:
                 
                 if len(flagged_neighbors) > tile.adjacent_bombs:
                     return False
-                
         return True
 
-    def make_action_set(self, action_pairs):
-        action_set = set()
-        for tile, actions in action_pairs:
-            for action in actions: action_set.add(action)
-        return action_set
-
+    # finds tiles that have two covered neighbors and one flag unaccounted for 
     def find_50_50_tiles(self, solver_grid:list[list[Solver_Tile]]) -> list[Solver_Tile]:
         tiles = []
         for row in range(len(solver_grid)):
@@ -161,6 +162,7 @@ class Solver:
                     tiles.append(tile)
         return tiles
     
+    # finds all unsolved tiles
     def find_unsolved(self, solver_grid:list[list[Solver_Tile]]) -> list[Solver_Tile]:
         tiles = []
         for row in range(len(solver_grid)):
@@ -176,7 +178,8 @@ class Solver:
                     tiles.append(tile)
         return tiles
 
-    #deterministic choices can be applied directly to the game board, so the game_grid object is passed in
+    # applies search_for_determinism() until no more actions can be taken. 
+    # modifies game_grid if passed in
     def solve_all_determinism(self, screen, solver_grid, game_grid=None): 
         change_made = True
         while change_made:
@@ -205,88 +208,84 @@ class Solver:
             self.extract_state(solver_grid)
         self.render(screen, solver_grid, 10)
 
+        return change_made
+
+    # finds actions invariant to choice of flags 
+    # returns list of actions in (action, (row, col)) format
     def find_guaranteed_actions(self, screen, solver_grid, source_tile):
         covered_tiles = source_tile.get_neighbors_of_state(State.COVERED)
         flagged_neighbors = source_tile.get_neighbors_of_state(State.FLAGGED)
         num_unflagged = (source_tile.adjacent_bombs - len(flagged_neighbors))
 
         guaranteed_actions = set()
-        returned_actions = []
 
-        first = True
-        possible_combinations_to_cover = combinations(covered_tiles, num_unflagged)
-        for combination in possible_combinations_to_cover:
+        for combination in combinations(covered_tiles, num_unflagged):
             #run sim with choice of flagged neighbors
             actions = self.run_simulation(solver_grid, combination)
 
             #if unfeasable choice, continue
             if actions == "unsat": 
                 print("found unsat configuration")
-                self.wait_for_input(screen, self.tiles)
+                # self.wait_for_input(screen, self.tiles)
                 continue
 
-            actions_set = set()
-            for action in actions: actions_set.add(action)
-            print("    consequent actions:")
-            for action, (row, col) in actions_set:
-                print("        ", action, f"({row}, {col})")
+            #else, add to the set structure
+            actions_set = set(actions)
+            guaranteed_actions = actions_set if not guaranteed_actions else actions_set & guaranteed_actions
 
-            returned_actions += [set(actions)]
-            
-            #initialize the list or do the intersection 
-            # if first:
-            #     guaranteed_actions = actions_set
-            #     first = False
-            # guaranteed_actions = guaranteed_actions.intersection(actions_set)
             self.clear_overlays()
 
         #convert the guaranteed actions into grid coordinates
-        guaranteed_actions = [(action, solver_grid[row][col]) for action, (row, col) in set.intersection(*returned_actions)]
-        # guaranteed_actions = [(action, solver_grid[row][col]) for action, tile in guaranteed_actions]
+        guaranteed_actions = [(action, solver_grid[row][col]) for action, (row, col) in guaranteed_actions]
         print(f"    guaranteed actions  : {[(action, (tile.row, tile.col)) for action, tile in guaranteed_actions]}")
+
         return guaranteed_actions 
 
 
 # note to self: make an action queue for game_grid object that takes in either debug actions or game actions
+# note to self: maybe pull out applying actions into separate subroutine
     def launch(self, game_grid, screen): 
-        #solve all low-hanging fruit
         iters = 0
         solved = False
         change_made = False
         while not solved:
-            
-            self.solve_all_determinism(screen, self.tiles, game_grid)
+            # take the easy actions
+            change_made = self.solve_all_determinism(screen, self.tiles, game_grid)
 
-            # potential_tiles = self.find_50_50_tiles(self.tiles)
+            #find actions that don't depend on choice of flags 
             potential_tiles = self.find_unsolved(self.tiles)
-            print("50/50: ", [(tile.row, tile.col) for tile in potential_tiles])
             for tile in potential_tiles:
-                print(f"looking at actions for 50/50 tile ({tile.row}, {tile.col}):")
+                print(f"looking at actions for tile ({tile.row}, {tile.col}):")
                 self.push_overlay(tile.row, tile.col, (255, 0, 0))
                 self.wait_for_input(screen, self.tiles)
 
                 guaranteed_actions = self.find_guaranteed_actions(screen, self.tiles, tile)
                 self.clear_overlays()
 
-
                 if len(guaranteed_actions) == 0: 
-                    print("no guaranteed actions")
+                    print(f"no guaranteed actions for tile ({tile.row}, {tile.col})")
                     continue
+
                 change_made = True
                 print("running guaranteed actions...")
-                print("intersect:")
-                for action, tile in guaranteed_actions:
-                    print("  ", action, f"({tile.row}, {tile.col})")
+                # print("intersect:")
+                # for action, tile in guaranteed_actions:
+                #     print("  ", action, f"({tile.row}, {tile.col})")
+
                 for action, acted_on_tile in guaranteed_actions:
-                        change_made = True
-                        acted_on_tile.state = action
-                        if action == State.FLAGGED:
-                            game_grid.flag_tile(acted_on_tile.row, acted_on_tile.col, True)
-                            self.push_and_render_overlay(screen, self.tiles, acted_on_tile.row, acted_on_tile.col, (255, 0, 0), 1000)
-                        if action == State.REVEALED:
-                            game_grid.uncover_tile(acted_on_tile.row, acted_on_tile.col)
-                            self.push_and_render_overlay(screen, self.tiles, acted_on_tile.row, acted_on_tile.col, (0, 255, 0), 1000)
+                    acted_on_tile.state = action
+                    if action == State.FLAGGED:
+                        game_grid.flag_tile(acted_on_tile.row, acted_on_tile.col, True)
+                        # self.push_and_render_overlay(screen, self.tiles, acted_on_tile.row, acted_on_tile.col, (255, 0, 0), 1000)
+                        self.push_overlay(acted_on_tile.row, acted_on_tile.col, (255, 0, 0))
+                    if action == State.REVEALED:
+                        game_grid.uncover_tile(acted_on_tile.row, acted_on_tile.col)
+                        # self.push_and_render_overlay(screen, self.tiles, acted_on_tile.row, acted_on_tile.col, (0, 255, 0), 1000)
+                        self.push_overlay(acted_on_tile.row, acted_on_tile.col, (0, 255, 0))
+
+                    self.render(screen, self.tiles, 100)
                 self.extract_state(self.tiles)
+                break
             if not change_made:
                 solved = True
                     
