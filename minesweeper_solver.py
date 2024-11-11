@@ -2,6 +2,7 @@ import pygame
 from itertools import combinations
 import copy
 from game_emulation import State, Game_grid
+from typing import List
 
 class Solver_Tile:
     def __init__(self) -> None:
@@ -45,7 +46,7 @@ class Solver:
         self.extract_state(self.tiles)
         self.overlays = []
 
-    #extracts state from the game emulator to the solver tiles passed into it
+    """Extract state from the game emulator to the solver tiles passed into it"""
     def extract_state(self, grid:list[list[Solver_Tile]]):
         for row in range(self.game_grid.size):
             for col in range(self.game_grid.size):
@@ -70,8 +71,13 @@ class Solver:
                         my_tile.neighbors.append(grid[d_row][d_col])
 
 
-    # finds all deterministic actions to take on the board
-    # does not modify state 
+    """
+    Find all deterministic actions to take on the board.
+
+    Does not modify state.
+    Returns a list of (source_tile, (action, acted_tile))
+    Source_tile is included for animation purposes.
+    """
     def search_for_determinism(self, solver_grid:list[list[Solver_Tile]], render = False):
         actions = []
         for row in range(len(solver_grid)):
@@ -97,7 +103,12 @@ class Solver:
                 
         return actions
     
-    # flags the combination and takes all deterministic actions, returns list of (action, (row, col))
+    """
+    Find all deterministic actions. 
+
+    Does not modify state of solver_grid
+    Returns list of (action, (row, col)).
+    """
     def run_simulation(self, solver_grid:list[list[Solver_Tile]], combination:list[Solver_Tile], render = False):
         actions = []
 
@@ -131,7 +142,11 @@ class Solver:
 
         return actions
 
-    #determines if board is internally consistent
+    """
+    Determine if board is internally consistent.
+
+    Returns True/False
+    """
     def is_sat(self, solver_grid:list[list[Solver_Tile]]):
         for row in range(len(solver_grid)):
             for col in range(len(solver_grid[row])):
@@ -146,7 +161,11 @@ class Solver:
                     return False
         return True
 
-    # finds tiles that have two covered neighbors and one flag unaccounted for 
+    """
+    Find tiles that have two covered neighbors and one flag unaccounted for.
+
+    Returns list of (SolverTile).
+    """
     def find_50_50_tiles(self, solver_grid:list[list[Solver_Tile]]) -> list[Solver_Tile]:
         tiles = []
         for row in range(len(solver_grid)):
@@ -162,7 +181,11 @@ class Solver:
                     tiles.append(tile)
         return tiles
     
-    # finds all unsolved tiles
+    """
+    Find all unsolved tiles.
+
+    Returns list of (SolverTile).
+    """
     def find_unsolved(self, solver_grid:list[list[Solver_Tile]]) -> list[Solver_Tile]:
         tiles = []
         for row in range(len(solver_grid)):
@@ -178,8 +201,12 @@ class Solver:
                     tiles.append(tile)
         return tiles
 
-    # applies search_for_determinism() until no more actions can be taken. 
-    # modifies game_grid if passed in
+    """
+    Appliy search_for_determinism() until no more actions can be taken. 
+
+    Modifies game_grid if passed in
+    returns whether a change was made (always False)
+    """
     def solve_all_determinism(self, screen, solver_grid, game_grid=None): 
         change_made = True
         while change_made:
@@ -210,8 +237,11 @@ class Solver:
 
         return change_made
 
-    # finds actions invariant to choice of flags 
-    # returns list of actions in (action, (row, col)) format
+    """
+    Find actions invariant to choice of flags for unsolved tile.
+
+    Returns list of actions in (action, (row, col)) format
+    """
     def find_guaranteed_actions(self, screen, solver_grid, source_tile):
         covered_tiles = source_tile.get_neighbors_of_state(State.COVERED)
         flagged_neighbors = source_tile.get_neighbors_of_state(State.FLAGGED)
