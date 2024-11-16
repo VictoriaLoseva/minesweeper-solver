@@ -1,3 +1,5 @@
+![](game_recording.gif)
+
 # Setup
 The only depdency is ```pygame```. Written with v2.5.2
 
