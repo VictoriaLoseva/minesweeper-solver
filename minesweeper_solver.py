@@ -119,7 +119,7 @@ class Solver:
         #flag the neighbors 
         for neighbor in combination:
             # print(f"    flagging {neighbor.row}, {neighbor.col}")
-            self.push_overlay(neighbor.row, neighbor.col, (255, 255, 0))
+            # self.push_overlay(neighbor.row, neighbor.col, (255, 255, 0))
             sim_grid[neighbor.row][neighbor.col].state = State.FLAGGED
             actions += [(State.FLAGGED, (neighbor.row, neighbor.col))]
         
@@ -138,7 +138,7 @@ class Solver:
 
             #store the performed actions
             actions += [(action, (tile.row, tile.col)) for action, tile in new_actions]
-        self.wait_for_input(self.screen, sim_grid)
+        # self.wait_for_input(self.screen, sim_grid)
 
         return actions
 
@@ -214,8 +214,6 @@ class Solver:
             
             tile_action_pairs = self.search_for_determinism(solver_grid)
             for tile, actions in tile_action_pairs:
-                # self.push_overlay(tile.row, tile.col, (255, 255, 150))
-                #self.render(5)
                 if len(actions) == 0: 
                     self.clear_overlays()
                     continue
@@ -270,6 +268,45 @@ class Solver:
         print(f"    guaranteed actions  : {[(action, (tile.row, tile.col)) for action, tile in guaranteed_actions]}")
 
         return guaranteed_actions 
+    
+    def apply_action(self, game_grid, action, row, col):
+        if action == State.FLAGGED:
+            game_grid.flag_tile(row, col, True)
+        if action == State.REVEALED:
+            game_grid.uncover_tile(row, col)
+        
+    def run_iteration(self, game_grid, screen, slow=False):
+        actions = self.search_for_determinism(self.tiles) 
+        if actions != []:
+            for source_tile, list_of_actions in actions: 
+                first_actionable = True                
+                for action, tile in list_of_actions:
+                    if slow: self.apply_action(game_grid, action, tile.row, tile.col)
+                    else:
+                        #determine if this action is a repeat
+                        actionable = game_grid.tiles[tile.row][tile.col].covered and not game_grid.tiles[tile.row][tile.col].flagged
+                        if actionable:
+                            if first_actionable: 
+                                first_actionable = False
+                                self.push_and_render_overlay(screen, self.tiles, source_tile.row, source_tile.col, (255, 0, 0), 200)
+
+                            self.push_overlay(tile.row, tile.col, (0, 255, 0))
+                            self.apply_action(game_grid, action, tile.row, tile.col)
+                        self.render(screen, self.tiles, 300)  
+                    
+                        self.clear_overlays()
+            return
+
+        for source_tile in self.find_unsolved(self.tiles):
+            actions = self.find_guaranteed_actions(screen, self.tiles, source_tile)
+            if actions != []: 
+                self.push_and_render_overlay(screen, self.tiles, source_tile.row, source_tile.col, (255, 255, 0), 400)
+                for action, tile in actions:
+                    self.push_overlay(tile.row, tile.col, (0, 255, 0))
+                    self.apply_action(game_grid, action, tile.row, tile.col)
+                self.render(screen, self.tiles, 500)
+                return
+        
 
 
 # note to self: make an action queue for game_grid object that takes in either debug actions or game actions
@@ -297,7 +334,7 @@ class Solver:
                     continue
 
                 change_made = True
-                print("running guaranteed actions...")
+                # print("running guaranteed actions...")
                 # print("intersect:")
                 # for action, tile in guaranteed_actions:
                 #     print("  ", action, f"({tile.row}, {tile.col})")
@@ -321,8 +358,8 @@ class Solver:
                     
 
 
-    def push_overlay(self, row, col, color):
-        self.overlays.append(self.Overlay(row, col, color))
+    def push_overlay(self, row, col, color, delay=0):
+        self.overlays.append(self.Overlay(row, col, color, delay))
 
     def pop_overlay(self):
         self.overlays.pop()
@@ -335,7 +372,7 @@ class Solver:
     def clear_overlays(self):
         self.overlays = []
 
-    def draw(self, screen, solver_grid):
+    def draw(self, screen, solver_grid=None):
         self.screen.fill((255, 255, 255))
         self.game_grid.draw(self.screen)
         dsize = self.game_grid.tile_draw_size
@@ -344,18 +381,20 @@ class Solver:
             offset = 2
             rect = (overlay.col * dsize + offset, overlay.row * dsize + offset, dsize - offset * 2, dsize - offset * 2)
             pygame.draw.rect(screen, overlay.color, rect, width=2)
+            pygame.display.update()
             pygame.time.wait(overlay.delay)
 
-        for row in range(self.game_grid.size):
-            for col in range(self.game_grid.size):
-                tile = solver_grid[row][col]
-                text_surface = self.font.render(".", True, (100, 0, 0))
-                if tile.flagged(): 
-                    text_surface = self.font.render("f", True, (100, 0, 0))
-                    # surface_w, surface_h = text_surface.get_size() 
-                elif tile.revealed(): 
-                    text_surface = self.font.render("r", True, (0, 100, 0))
-                self.screen.blit(text_surface, (col * dsize, row * dsize))
+        # if solver_grid==None: return 
+        # for row in range(self.game_grid.size):
+        #     for col in range(self.game_grid.size):
+        #         tile = solver_grid[row][col]
+        #         text_surface = self.font.render(".", True, (100, 0, 0))
+        #         if tile.flagged(): 
+        #             text_surface = self.font.render("f", True, (100, 0, 0))
+        #             # surface_w, surface_h = text_surface.get_size() 
+        #         elif tile.revealed(): 
+        #             text_surface = self.font.render("r", True, (0, 100, 0))
+        #         self.screen.blit(text_surface, (col * dsize, row * dsize))
 
     def render(self, screen, solver_grid, wait_time = 0):
         self.draw(screen, solver_grid)

@@ -20,13 +20,34 @@ def proccess_events(game_grid):
                 print(game_grid)
             if event.key == pygame.K_s:
                 solver = Solver(game_grid, screen)
-                solver.launch(game_grid, screen)
+                slow_mod = event.mod & pygame.KMOD_SHIFT
+                solver.run_iteration(game_grid, screen, slow=slow_mod)
+
     return game_grid
 
+# Set up game
 pygame.init()
-game_grid = Game_grid(18, 60)
+# game_grid = Game_grid(18, 60)
+board_width = 10
+num_bombs = 20
+game_grid = Game_grid(board_width, num_bombs)
 print(game_grid)
-screen = pygame.display.set_mode([18*32, 18*32])
+screen = pygame.display.set_mode([board_width*32, board_width*32])
+pygame.display.set_caption("minesweeper")
+
+# Set up screen capture
+recording = True
+frame_number = 0
+
+def update_and_save():
+    global frame_number
+    filename = "rec/%04d.png" % (frame_number)
+    pygame.image.save(screen, filename)
+    frame_number += 1
+    return pygame.display.update
+
+pygame.display.update = update_and_save
+
 
 
 running = True
@@ -42,6 +63,8 @@ while game_grid is not None:
 
     # Flip the display
     pygame.display.flip()
+
+    #Take a screnshot
 
 # Done! Time to quit.
 pygame.quit()
