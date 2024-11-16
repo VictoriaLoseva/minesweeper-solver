@@ -1,4 +1,6 @@
-![](game_recording.gif)
+<p align="center">
+   <img src="game_recording.gif">
+</p>
 
 # Setup
 The only depdency is ```pygame```. Written with v2.5.2
