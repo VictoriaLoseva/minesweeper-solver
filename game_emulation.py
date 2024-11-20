@@ -1,13 +1,14 @@
 import pygame
 from enum import Enum
 import random
+from functools import singledispatch
 
-class Tile:
-    def __init__(self) -> None:
-        self.covered = True
-        self.has_bomb = False
-        self.adjacent_bombs = 0
-        self.flagged = False
+class Tile:    
+    def __init__(self, covered=True, has_bomb=False, adjacent_bombs=0, flagged=False) -> None: 
+        self.covered = covered
+        self.has_bomb = has_bomb
+        self.adjacent_bombs = adjacent_bombs
+        self.flagged = flagged
 
 class State(Enum):
     COVERED = 0
@@ -16,11 +17,14 @@ class State(Enum):
 
 
 class Game_grid:
-    def __init__(self, grid_size, num_bombs, tile_draw_size = 32) -> None:
+    def __init__(self, grid_size, num_bombs, tile_draw_size = 32, load=[]) -> None:
         self.tile_draw_size = tile_draw_size
         self.bombs = num_bombs
         self.size = grid_size
-        self.tiles = [ [Tile() for x in range(grid_size)] for y in range(grid_size)]
+        if load: 
+            self.tiles = [ [Tile(cov, bomb, num, flag) for (cov, bomb, num, flag) in row] for row in load]
+        else: 
+            self.tiles = [ [Tile() for x in range(grid_size)] for y in range(grid_size)]
         self.font = pygame.font.Font(None, 30)
         self.game_started = False
 
@@ -29,8 +33,8 @@ class Game_grid:
 
         self.bomb_sprite = pygame.image.load('img/emoji_u1f4a3.svg')
         self.bomb_sprite =  pygame.transform.scale(self.bomb_sprite, (25, 25))
-
         # self.lock_sprite = seguisy80.render('🔒', True, (255, 0, 0))
+
 
     def start_game(self, init_row, init_col):
         if init_row == None: init_row = self.size//2
@@ -129,9 +133,13 @@ class Game_grid:
         tile = self.tiles[row][col]
         if tile.covered:
             tile.flagged = flagged if flagged != None else not tile.flagged
+        
 
     def mouse_to_row_col(self, mouse_x, mouse_y = None):
         if mouse_y == None:
             return (mouse_x[1]//self.tile_draw_size, mouse_x[0]//self.tile_draw_size)
         return (mouse_y//self.tile_draw_size, mouse_x//self.tile_draw_size)
 
+    def dump(self):
+        return [[(tile.covered, tile.has_bomb, tile.adjacent_bombs, tile.flagged) for tile in row] for row in self.tiles]
+    

@@ -1,8 +1,7 @@
 import pygame
 from itertools import combinations
-import copy
+import copy, os
 from game_emulation import State, Game_grid
-from typing import List
 
 class Solver_Tile:
     def __init__(self) -> None:
@@ -35,6 +34,7 @@ class Solver:
             self.color = color
             self.delay = delay
     
+
     def __init__(self, game_grid:Game_grid, screen) -> None:
         self.screen = screen
         self.font = pygame.font.Font(None, 20)
@@ -122,6 +122,8 @@ class Solver:
             # self.push_overlay(neighbor.row, neighbor.col, (255, 255, 0))
             sim_grid[neighbor.row][neighbor.col].state = State.FLAGGED
             actions += [(State.FLAGGED, (neighbor.row, neighbor.col))]
+
+        if not self.is_sat(sim_grid): return "unsat"
         
         #search for determinism until no more actions can be taken 
         while True: 
@@ -158,6 +160,9 @@ class Solver:
                 flagged_neighbors = tile.get_neighbors_of_state(State.FLAGGED)
                 
                 if len(flagged_neighbors) > tile.adjacent_bombs:
+                    return False
+                
+                if len(flagged_neighbors) < tile.adjacent_bombs and len(tile.get_neighbors_of_state(State.COVERED)) == 0:
                     return False
         return True
 
@@ -295,8 +300,10 @@ class Solver:
                         self.render(screen, self.tiles, 300)  
                     
                         self.clear_overlays()
+            self.extract_state(self.tiles)
             return
 
+        game_state = game_grid.dump()
         for source_tile in self.find_unsolved(self.tiles):
             actions = self.find_guaranteed_actions(screen, self.tiles, source_tile)
             if actions != []: 
@@ -305,6 +312,16 @@ class Solver:
                     self.push_overlay(tile.row, tile.col, (0, 255, 0))
                     self.apply_action(game_grid, action, tile.row, tile.col)
                 self.render(screen, self.tiles, 500)
+                self.extract_state(self.tiles)
+
+                tiles_revealed = [tile for action, tile in actions if action == State.REVEALED]
+                if ["x" for tile in tiles_revealed if game_grid.tiles[tile.row][tile.col].has_bomb]:
+                    filename = "logs/%03d.txt" % (len(os.listdir('logs')))
+                    with open(filename, 'w') as f:
+                        f.write(str(game_grid.size) + "\n")
+                        f.write(str(game_grid.bombs) + "\n")
+                        f.write(f"({source_tile.row}, {source_tile.col})\n")
+                        f.write(str(game_state))
                 return
         
 
