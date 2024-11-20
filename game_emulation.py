@@ -23,10 +23,14 @@ class Game_grid:
         self.tiles = [ [Tile() for x in range(grid_size)] for y in range(grid_size)]
         self.font = pygame.font.Font(None, 30)
         self.game_started = False
-        seguisy80 = pygame.font.SysFont("segoeuisymbol", 26)
-        self.red_flag_sprite = seguisy80.render('🚩', True, (180, 0, 0))
-        self.bomb_sprite = seguisy80.render('💣', True, (255, 0, 0))
-        self.lock_sprite = seguisy80.render('🔒', True, (255, 0, 0))
+
+        self.red_flag_sprite = pygame.image.load('img/emoji_u1f6a9.svg')
+        self.red_flag_sprite = pygame.transform.scale(self.red_flag_sprite, (25, 25))
+
+        self.bomb_sprite = pygame.image.load('img/emoji_u1f4a3.svg')
+        self.bomb_sprite =  pygame.transform.scale(self.bomb_sprite, (25, 25))
+
+        # self.lock_sprite = seguisy80.render('🔒', True, (255, 0, 0))
 
     def start_game(self, init_row, init_col):
         if init_row == None: init_row = self.size//2
