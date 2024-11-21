@@ -26,7 +26,7 @@ class Game_grid:
         else: 
             self.tiles = [ [Tile() for x in range(grid_size)] for y in range(grid_size)]
         self.font = pygame.font.Font(None, 30)
-        self.game_started = False
+        self.game_started = True if load else False
 
         self.red_flag_sprite = pygame.image.load('img/emoji_u1f6a9.svg')
         self.red_flag_sprite = pygame.transform.scale(self.red_flag_sprite, (25, 25))
