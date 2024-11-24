@@ -35,7 +35,7 @@ class Solver:
             self.delay = delay
     
 
-    def __init__(self, game_grid:Game_grid, screen) -> None:
+    def __init__(self, game_grid:Game_grid, screen, debug=False) -> None:
         self.screen = screen
         self.font = pygame.font.Font(None, 20)
         self.game_grid = game_grid
@@ -45,6 +45,7 @@ class Solver:
         self.tiles = [[Solver_Tile() for col in range(game_grid.size) ] for row in range(game_grid.size)]
         self.extract_state(self.tiles)
         self.overlays = []
+        self.debug = debug
 
     """Extract state from the game emulator to the solver tiles passed into it"""
     def extract_state(self, grid:list[list[Solver_Tile]]):
@@ -136,11 +137,12 @@ class Solver:
             #apply the actions
             for action, acted_on_tile in new_actions:
                         acted_on_tile.state = action
-            if not self.is_sat(sim_grid): return "unsat"
+            if not self.is_sat(sim_grid): 
+                return "unsat"
 
             #store the performed actions
             actions += [(action, (tile.row, tile.col)) for action, tile in new_actions]
-        # self.wait_for_input(self.screen, sim_grid)
+        if self.debug: self.render(self.screen, sim_grid, wait_for_click=True)
 
         return actions
 
@@ -251,6 +253,7 @@ class Solver:
         num_unflagged = (source_tile.adjacent_bombs - len(flagged_neighbors))
 
         guaranteed_actions = set()
+        first = True
 
         for combination in combinations(covered_tiles, num_unflagged):
             #run sim with choice of flagged neighbors
@@ -264,9 +267,12 @@ class Solver:
 
             #else, add to the set structure
             actions_set = set(actions)
-            guaranteed_actions = actions_set if not guaranteed_actions else actions_set & guaranteed_actions
-
-            self.clear_overlays()
+            # print(f"actions: {[(action, tile) for action, tile in actions]}")
+            if first: 
+                guaranteed_actions = actions_set
+                first = False
+            else: guaranteed_actions = actions_set & guaranteed_actions
+            print(guaranteed_actions)
 
         #convert the guaranteed actions into grid coordinates
         guaranteed_actions = [(action, solver_grid[row][col]) for action, (row, col) in guaranteed_actions]
@@ -280,9 +286,10 @@ class Solver:
         if action == State.REVEALED:
             game_grid.uncover_tile(row, col)
         
-    def run_iteration(self, game_grid, screen, slow=False):
+    def run_iteration(self, game_grid, screen, slow=False, start_tile=None):
         actions = self.search_for_determinism(self.tiles) 
         if actions != []:
+            print("iterating...")
             for source_tile, list_of_actions in actions: 
                 first_actionable = True                
                 for action, tile in list_of_actions:
@@ -304,7 +311,9 @@ class Solver:
             return
 
         game_state = game_grid.dump()
-        for source_tile in self.find_unsolved(self.tiles):
+        source_tiles = [self.tiles[start_tile[0]][start_tile[1]]] if start_tile else self.find_unsolved(self.tiles)
+        for source_tile in source_tiles:
+            if(self.debug): self.push_and_render_overlay(screen, self.tiles, source_tile.row, source_tile.col, (255, 255, 0), 0)
             actions = self.find_guaranteed_actions(screen, self.tiles, source_tile)
             if actions != []: 
                 self.push_and_render_overlay(screen, self.tiles, source_tile.row, source_tile.col, (255, 255, 0), 400)
@@ -314,6 +323,7 @@ class Solver:
                 self.render(screen, self.tiles, 500)
                 self.extract_state(self.tiles)
 
+                if self.debug: return
                 tiles_revealed = [tile for action, tile in actions if action == State.REVEALED]
                 if ["x" for tile in tiles_revealed if game_grid.tiles[tile.row][tile.col].has_bomb]:
                     filename = "logs/%03d.txt" % (len(os.listdir('logs')))
@@ -402,22 +412,25 @@ class Solver:
             pygame.time.wait(overlay.delay)
 
         # if solver_grid==None: return 
-        # for row in range(self.game_grid.size):
-        #     for col in range(self.game_grid.size):
-        #         tile = solver_grid[row][col]
-        #         text_surface = self.font.render(".", True, (100, 0, 0))
-        #         if tile.flagged(): 
-        #             text_surface = self.font.render("f", True, (100, 0, 0))
-        #             # surface_w, surface_h = text_surface.get_size() 
-        #         elif tile.revealed(): 
-        #             text_surface = self.font.render("r", True, (0, 100, 0))
-        #         self.screen.blit(text_surface, (col * dsize, row * dsize))
+        if self.debug:
+            for row in range(self.game_grid.size):
+                for col in range(self.game_grid.size):
+                    tile = solver_grid[row][col]
+                    text_surface = self.font.render(".", True, (100, 0, 0))
+                    if tile.flagged(): 
+                        text_surface = self.font.render("f", True, (100, 0, 0))
+                        # surface_w, surface_h = text_surface.get_size() 
+                    elif tile.revealed(): 
+                        text_surface = self.font.render("r", True, (0, 100, 0))
+                    self.screen.blit(text_surface, (col * dsize, row * dsize))
 
-    def render(self, screen, solver_grid, wait_time = 0):
+    def render(self, screen, solver_grid, wait_time=0, wait_for_click=False):
         self.draw(screen, solver_grid)
         pygame.display.flip()
-        #proccess_events(self.game_grid)
         pygame.time.wait(wait_time)
+        while(wait_for_click): 
+            for event in pygame.event.get(): 
+                if event.type == pygame.KEYDOWN: wait_for_click = False
     
     def wait_for_input(self, screen, solver_grid, clear_overlays = False):
         reee = True

@@ -28,10 +28,9 @@ def proccess_events(game_grid):
 # Set up game
 pygame.init()
 # game_grid = Game_grid(18, 60)
-board_width = 10
-num_bombs = 20
+board_width = 25
+num_bombs = 140
 game_grid = Game_grid(board_width, num_bombs)
-print(game_grid)
 screen = pygame.display.set_mode([board_width*32, board_width*32])
 pygame.display.set_caption("minesweeper")
 
@@ -41,12 +40,12 @@ frame_number = 0
 
 def update_and_save():
     global frame_number
-    filename = "rec/%04d.png" % (frame_number)
+    filename = "rec/frames/%04d.png" % (frame_number)
     pygame.image.save(screen, filename)
     frame_number += 1
     return pygame.display.update
 
-pygame.display.update = update_and_save
+if recording: pygame.display.update = update_and_save
 
 
 
